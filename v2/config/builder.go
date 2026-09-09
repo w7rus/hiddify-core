@@ -386,31 +386,39 @@ func setExperimental(options *option.Options, hopt *HiddifyOptions) {
 			hopt.ConnectionTestUrls = []string{hopt.ConnectionTestUrl}
 		}
 	}
+	// The cache file and monitoring are internal machinery - they persist the WARP
+	// config and drive URL tests and latency. They used to sit inside the
+	// EnableClashApi branch, which meant switching off the Clash control API also
+	// silently disabled them. Keep them unconditional so the toggle is safe to use.
+	options.Experimental = &option.ExperimentalOptions{
+		UnifiedDelay: &option.UnifiedDelayOptions{
+			Enabled: true,
+		},
+
+		CacheFile: &option.CacheFileOptions{
+			Enabled:         true,
+			StoreWARPConfig: true,
+			Path:            "data/clash.db",
+		},
+
+		Monitoring: &option.MonitoringOptions{
+			URLs:           hopt.ConnectionTestUrls,
+			Interval:       badoption.Duration(hopt.URLTestInterval.Duration()),
+			DebounceWindow: badoption.Duration(time.Millisecond * 500),
+			IdleTimeout:    badoption.Duration(hopt.URLTestInterval.Duration().Nanoseconds() * 3),
+		},
+	}
+
+	// The Clash API is a local control plane: it can read the running
+	// configuration, enumerate servers and switch outbounds. It is opt-in, and
+	// always carries a secret so a local process cannot simply connect to it.
 	if hopt.EnableClashApi {
 		if hopt.ClashApiSecret == "" {
 			hopt.ClashApiSecret = generateRandomString(16)
 		}
-		options.Experimental = &option.ExperimentalOptions{
-			UnifiedDelay: &option.UnifiedDelayOptions{
-				Enabled: true,
-			},
-			ClashAPI: &option.ClashAPIOptions{
-				ExternalController: fmt.Sprintf("%s:%d", "127.0.0.1", hopt.ClashApiPort),
-				Secret:             hopt.ClashApiSecret,
-			},
-
-			CacheFile: &option.CacheFileOptions{
-				Enabled:         true,
-				StoreWARPConfig: true,
-				Path:            "data/clash.db",
-			},
-
-			Monitoring: &option.MonitoringOptions{
-				URLs:           hopt.ConnectionTestUrls,
-				Interval:       badoption.Duration(hopt.URLTestInterval.Duration()),
-				DebounceWindow: badoption.Duration(time.Millisecond * 500),
-				IdleTimeout:    badoption.Duration(hopt.URLTestInterval.Duration().Nanoseconds() * 3),
-			},
+		options.Experimental.ClashAPI = &option.ClashAPIOptions{
+			ExternalController: fmt.Sprintf("%s:%d", "127.0.0.1", hopt.ClashApiPort),
+			Secret:             hopt.ClashApiSecret,
 		}
 	}
 }
