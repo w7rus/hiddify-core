@@ -57,6 +57,14 @@ type InboundOptions struct {
 	MTU              uint32 `json:"mtu,omitempty"`
 	StrictRoute      bool   `json:"strict-route,omitempty"`
 	TUNStack         string `json:"tun-implementation,omitempty"`
+
+	// Credentials for the mixed (HTTP+SOCKS) inbound. When set, the inbound
+	// requires authentication, so local processes that merely find the port
+	// cannot tunnel through it. Minted per core start by the client.
+	MixedUsername string `json:"mixed-username,omitempty"`
+	MixedPassword string `json:"mixed-password,omitempty"`
+	// Password for LAN sharing, used with the username "hiddify".
+	LanSharingPassword string `json:"lan-sharing-password,omitempty"`
 }
 
 type URLTestOptions struct {

@@ -2,9 +2,9 @@ package config
 
 import (
 	context "context"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/netip"
 	"net/url"
@@ -17,6 +17,7 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	sdns "github.com/sagernet/sing-box/dns"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing/common/auth"
 	"github.com/sagernet/sing/common/json/badoption"
 	"github.com/sagernet/wireguard-go/hiddify"
 )
@@ -492,6 +493,18 @@ func setInbound(options *option.Options, hopt *HiddifyOptions) {
 		binds = append(binds, "127.0.0.1")
 	}
 
+	// Users for the mixed inbound. The bind list above is exclusive: enabling LAN
+	// sharing binds 0.0.0.0/:: *instead of* loopback, so there is only ever one
+	// mixed inbound and this list governs the app and LAN clients alike.
+	// No policy is applied here - the client decides whether to send credentials.
+	var mixedUsers []auth.User
+	if hopt.MixedUsername != "" && hopt.MixedPassword != "" {
+		mixedUsers = append(mixedUsers, auth.User{Username: hopt.MixedUsername, Password: hopt.MixedPassword})
+	}
+	if hopt.AllowConnectionFromLAN && hopt.LanSharingPassword != "" {
+		mixedUsers = append(mixedUsers, auth.User{Username: "hiddify", Password: hopt.LanSharingPassword})
+	}
+
 	for _, bind := range binds {
 		addr := badoption.Addr(netip.MustParseAddr(bind))
 
@@ -501,6 +514,7 @@ func setInbound(options *option.Options, hopt *HiddifyOptions) {
 				Type: C.TypeMixed,
 				Tag:  InboundMixedTag + bind,
 				Options: &option.HTTPMixedInboundOptions{
+					Users: mixedUsers,
 					ListenOptions: option.ListenOptions{
 						Listen:     &addr,
 						ListenPort: hopt.MixedPort,
