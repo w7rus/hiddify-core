@@ -69,7 +69,7 @@ func startTunnelRequest(opt *TunnelStartRequest, installService bool) (bool, err
 	}
 	defer conn.Close()
 	c := NewTunnelServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(withToken(context.Background()), time.Second*5)
 	defer cancel()
 	_, _ = c.Stop(ctx, &hcommon.Empty{})
 	res, err := c.Start(ctx, opt)
@@ -94,7 +94,7 @@ func stopTunnelRequest() error {
 	}
 	defer conn.Close()
 	c := NewTunnelServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithTimeout(withToken(context.Background()), time.Second*20)
 	defer cancel()
 
 	res, err := c.Stop(ctx, &hcommon.Empty{})
@@ -115,7 +115,7 @@ func ExitTunnelService() (bool, error) {
 	}
 	defer conn.Close()
 	c := NewTunnelServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(withToken(context.Background()), time.Second*1)
 	defer cancel()
 
 	res, err := c.Exit(ctx, &hcommon.Empty{})
