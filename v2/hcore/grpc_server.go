@@ -79,6 +79,10 @@ func Setup(params *SetupRequest, platformInterface libbox.PlatformInterface) err
 	sUserID = os.Getuid()
 	sGroupID = os.Getgid()
 
+	// Must happen before any gRPC server starts, and after sWorkingPath is set:
+	// the token is persisted there for clients that attach to a running core.
+	resolveGrpcSecret(params.Secret)
+
 	var defaultWriter io.Writer
 	if !params.Debug {
 		defaultWriter = io.Discard
@@ -197,7 +201,12 @@ func StartGrpcServerByMode(listenAddressG string, mode SetupMode) (*grpc.Server,
 	}
 
 	if mode == SetupMode_GRPC_BACKGROUND_INSECURE || mode == SetupMode_GRPC_NORMAL_INSECURE {
-		grpcServer[mode] = grpc.NewServer()
+		// No transport security on these modes, so the Core service is gated on the
+		// setup token instead - otherwise any local process could drive it.
+		grpcServer[mode] = grpc.NewServer(
+			grpc.UnaryInterceptor(grpcAuthUnaryInterceptor()),
+			grpc.StreamInterceptor(grpcAuthStreamInterceptor()),
+		)
 	} else {
 		table := db.GetTable[hcommon.AppSettings]()
 		Log(LogLevel_DEBUG, LogType_CORE, table)
