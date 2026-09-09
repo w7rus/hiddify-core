@@ -55,8 +55,11 @@ func (s *server) GenerateFullConfig(ctx context.Context, in *GenerateConfigReque
 	}, nil
 }
 
+// StartGRPCServer exposes CoreService with no authentication whatsoever, so it
+// is bound to loopback. It currently has no callers; do not wire it up to a
+// reachable address without adding authentication first.
 func StartGRPCServer(port uint16) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}

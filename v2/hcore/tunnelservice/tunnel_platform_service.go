@@ -25,7 +25,14 @@ func (m *hiddifyNext) StartTunnelGrpcServer(listenAddressG string) (*grpc.Server
 		log.Printf("failed to listen: %v", err)
 		return nil, err
 	}
-	s := grpc.NewServer()
+	// This service is elevated: gate it behind a token so an unprivileged local
+	// process cannot start, stop or reconfigure the system TUN device.
+	token, err := issueToken()
+	if err != nil {
+		log.Printf("failed to issue tunnel service token: %v", err)
+		return nil, err
+	}
+	s := grpc.NewServer(grpc.UnaryInterceptor(authUnaryInterceptor(token)))
 	m.tunnelService = &TunnelService{}
 	RegisterTunnelServiceServer(s, m.tunnelService)
 

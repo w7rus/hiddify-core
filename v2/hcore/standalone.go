@@ -2,6 +2,8 @@ package hcore
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -155,6 +157,18 @@ func extractRefreshInterval(header http.Header, bodyStr string) (int, error) {
 	return 0, nil
 }
 
+// generateSecret returns a cryptographically random token for the Clash API,
+// which can read the running configuration and switch outbounds.
+func generateSecret(length int) string {
+	buf := make([]byte, (length*6+7)/8)
+	if _, err := rand.Read(buf); err != nil {
+		// Without entropy we cannot produce a secret, and serving the control API
+		// under a guessable one is worse than not serving it at all.
+		panic("hcore: unable to generate Clash API secret: " + err.Error())
+	}
+	return base64.RawURLEncoding.EncodeToString(buf)[:length]
+}
+
 func buildStandaloneConfig(ctx context.Context, ropt *config.ReadOptions, hopts *config.HiddifyOptions) (string, error) {
 	finalconfig, err := config.ParseBuildConfig(ctx, hopts, ropt)
 	if err != nil {
@@ -162,17 +176,23 @@ func buildStandaloneConfig(ctx context.Context, ropt *config.ReadOptions, hopts 
 	}
 
 	finalconfig.Log.Output = ""
+	// The Clash API can read the running configuration and switch outbounds, so it
+	// always gets a secret. Previously this literal left Secret empty, which served
+	// the web UI unauthenticated.
+	clashSecret := hopts.ClashApiSecret
+	if clashSecret == "" {
+		clashSecret = generateSecret(16)
+	}
 	finalconfig.Experimental = &option.ExperimentalOptions{
 		ClashAPI: &option.ClashAPIOptions{
 			ExternalUI: "webui",
+			Secret:     clashSecret,
 		},
 	}
-	// finalconfig.Experimental.ClashAPI.ExternalUI = "webui"
-	if hopts.AllowConnectionFromLAN {
-		finalconfig.Experimental.ClashAPI.ExternalController = "0.0.0.0:16756"
-	} else {
-		finalconfig.Experimental.ClashAPI.ExternalController = "127.0.0.1:16756"
-	}
+	// Bound to loopback regardless of AllowConnectionFromLAN: that option is about
+	// sharing the *proxy*, not about exposing a control API that can read configs
+	// and reroute traffic to the whole network.
+	finalconfig.Experimental.ClashAPI.ExternalController = "127.0.0.1:16756"
 
 	fmt.Printf("Open http://localhost:6756/ui/?secret=%s in your browser\n", finalconfig.Experimental.ClashAPI.Secret)
 
