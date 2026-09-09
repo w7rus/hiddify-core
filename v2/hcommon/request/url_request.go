@@ -24,10 +24,15 @@ const (
 )
 
 type Request struct {
-	Method    Method
-	Url       string
-	SocksPort uint16
-	Timeout   time.Duration
+	Method Method
+	Url    string
+	// SocksPort addresses a local SOCKS inbound. Set the credentials too when
+	// that inbound requires them - local proxies are authenticated so other
+	// processes on the machine cannot use them.
+	SocksPort     uint16
+	SocksUsername string
+	SocksPassword string
+	Timeout       time.Duration
 }
 
 func Send(req Request) (*Response, error) {
@@ -45,7 +50,11 @@ func Send(req Request) (*Response, error) {
 
 	var transport *http.Transport
 	if req.SocksPort > 0 {
-		dialer, err := proxy.SOCKS5("tcp", fmt.Sprintf("127.0.0.1:%d", req.SocksPort), nil, proxy.Direct)
+		var auth *proxy.Auth
+		if req.SocksUsername != "" {
+			auth = &proxy.Auth{User: req.SocksUsername, Password: req.SocksPassword}
+		}
+		dialer, err := proxy.SOCKS5("tcp", fmt.Sprintf("127.0.0.1:%d", req.SocksPort), auth, proxy.Direct)
 		if err != nil {
 			return nil, err
 		}

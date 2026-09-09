@@ -41,7 +41,16 @@ func RunInstance(ctx context.Context, hiddifySettings *config.HiddifyOptions, si
 		hiddifySettings = config.DefaultHiddifyOptions()
 	}
 	hiddifySettings.EnableClashApi = false
+	// This spins up a second mixed inbound of its own, separate from the one the
+	// app configures. It used to be left unauthenticated on a kernel-assigned
+	// port, so anything else on the machine could find it and tunnel through it.
+	instanceUser := generateSecret(16)
+	instancePassword := generateSecret(24)
 	hiddifySettings.InboundOptions.MixedPort = getRandomAvailblePort()
+	hiddifySettings.InboundOptions.MixedUsername = instanceUser
+	hiddifySettings.InboundOptions.MixedPassword = instancePassword
+	// Never expose this instance beyond loopback, whatever the caller asked for.
+	hiddifySettings.AllowConnectionFromLAN = false
 	hiddifySettings.InboundOptions.EnableTun = false
 	hiddifySettings.InboundOptions.EnableTunService = false
 	hiddifySettings.InboundOptions.SetSystemProxy = false
@@ -65,7 +74,10 @@ func RunInstance(ctx context.Context, hiddifySettings *config.HiddifyOptions, si
 	<-time.After(250 * time.Millisecond)
 	hservice := &HiddifyInstance{
 		StartedService: instance,
-		ListenPort:     hiddifySettings.InboundOptions.MixedPort}
+		ListenPort:     hiddifySettings.InboundOptions.MixedPort,
+		ListenUsername: instanceUser,
+		ListenPassword: instancePassword,
+	}
 	hservice.PingCloudflare()
 	return hservice, nil
 }
@@ -93,7 +105,11 @@ func (s *HiddifyInstance) ContentFromURL(method string, url string, timeout time
 		return "", err
 	}
 
-	dialer, err := proxy.SOCKS5("tcp", fmt.Sprintf("127.0.0.1:%d", s.ListenPort), nil, proxy.Direct)
+	var auth *proxy.Auth
+	if s.ListenUsername != "" {
+		auth = &proxy.Auth{User: s.ListenUsername, Password: s.ListenPassword}
+	}
+	dialer, err := proxy.SOCKS5("tcp", fmt.Sprintf("127.0.0.1:%d", s.ListenPort), auth, proxy.Direct)
 	if err != nil {
 		return "", err
 	}
