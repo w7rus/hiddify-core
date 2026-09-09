@@ -260,12 +260,17 @@ func downloadProfileContent(ctx context.Context, url string) (*request.Response,
 			if err1 != nil {
 				return nil, fmt.Errorf("%v,error running instance: %v", err, err1)
 			}
+			// Without this the instance - and the local inbound it opened - stayed
+			// alive for the rest of the process.
+			defer instance.Close()
 			instance.PingCloudflare()
 			resp, err1 = request.Send(request.Request{
-				Url:       url,
-				Method:    request.GET,
-				Timeout:   5 * time.Second,
-				SocksPort: instance.ListenPort,
+				Url:           url,
+				Method:        request.GET,
+				Timeout:       5 * time.Second,
+				SocksPort:     instance.ListenPort,
+				SocksUsername: instance.ListenUsername,
+				SocksPassword: instance.ListenPassword,
 			})
 			if err1 != nil {
 				err = fmt.Errorf("%v, Fragment: %v", err, err1)
