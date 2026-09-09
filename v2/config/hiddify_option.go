@@ -58,6 +58,12 @@ type InboundOptions struct {
 	StrictRoute      bool   `json:"strict-route,omitempty"`
 	TUNStack         string `json:"tun-implementation,omitempty"`
 
+	// TUN interface addresses. Empty keeps the historical constants, which are
+	// identical on every install and so identify the software to anything that
+	// fingerprints the tunnel's subnet. The client supplies a per-install value.
+	TunAddressV4 string `json:"tun-address-v4,omitempty"`
+	TunAddressV6 string `json:"tun-address-v6,omitempty"`
+
 	// Credentials for the mixed (HTTP+SOCKS) inbound. When set, the inbound
 	// requires authentication, so local processes that merely find the port
 	// cannot tunnel through it. Minted per core start by the client.

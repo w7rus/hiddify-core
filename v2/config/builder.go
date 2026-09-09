@@ -477,9 +477,9 @@ func setInbound(options *option.Options, hopt *HiddifyOptions) {
 		// default:
 
 		// }
-		opts.Address = []netip.Prefix{netip.MustParsePrefix("172.19.0.1/28")}
+		opts.Address = []netip.Prefix{tunPrefixOrDefault(hopt.TunAddressV4, "172.19.0.1/28")}
 		if ipv6Enable {
-			opts.Address = append(opts.Address, netip.MustParsePrefix("fdfe:dcba:9876::1/126"))
+			opts.Address = append(opts.Address, tunPrefixOrDefault(hopt.TunAddressV6, "fdfe:dcba:9876::1/126"))
 		}
 
 		options.Inbounds = append(options.Inbounds, tunInbound)
@@ -1227,6 +1227,18 @@ func removeDuplicateStr(strSlice []string) []string {
 		}
 	}
 	return list
+}
+
+// tunPrefixOrDefault parses a client-supplied TUN address, falling back to the
+// historical constant when it is absent or unparseable. The fallback matters: an
+// install that cannot supply an address must still get a working tunnel.
+func tunPrefixOrDefault(value string, fallback string) netip.Prefix {
+	if value != "" {
+		if prefix, err := netip.ParsePrefix(value); err == nil {
+			return prefix
+		}
+	}
+	return netip.MustParsePrefix(fallback)
 }
 
 func generateRandomString(length int) string {
